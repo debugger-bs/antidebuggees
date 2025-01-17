@@ -39,6 +39,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ptrace_someone"
+version = "0.1.0"
+dependencies = [
+ "nix",
+]
+
+[[package]]
 name = "sigtrap_handle"
 version = "0.1.0"
 dependencies = [
