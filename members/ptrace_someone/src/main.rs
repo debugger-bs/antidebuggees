@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{exit, Child, Command};
 
+use nix::sys::ptrace::{self, Options};
+use nix::unistd::Pid;
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -24,7 +27,18 @@ fn main() {
     let mut child =
         launch(path_to_executable, &process_args).expect("could not launch child process");
 
-    child.wait().expect("child died :(");
+    trace(&child);
+    child.wait().expect("child is dead");
+}
+
+fn trace(child: &Child) {
+    let pid = Pid::from_raw(child.id() as i32);
+    println!("pid of child: {pid}");
+    ptrace::attach(pid).expect("could not attach ptrace to child");
+    // if let Err(e) = ptrace::cont(pid, None) {
+    //     eprintln!("ptrace cannot continue: {e}");
+    //     exit(4)
+    // }
 }
 
 fn launch(path_to_executable: impl AsRef<Path>, args: &[String]) -> Result<Child, std::io::Error> {
