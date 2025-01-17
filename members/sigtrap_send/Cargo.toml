@@ -1,5 +1,5 @@
 [package]
-name = "sigtrap_handle"
+name = "sigtrap_send"
 version = "0.1.0"
 edition = "2021"
 

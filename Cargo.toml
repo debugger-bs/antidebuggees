@@ -1,2 +1,5 @@
 [workspace]
-members = ["members/sigtrap_handle"]
+members = ["members/sigtrap_handle", "members/sigtrap_send"]
+
+[workspace.dependencies]
+nix = { version = "0.29.0", features = ["signal"] }
