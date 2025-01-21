@@ -5,6 +5,6 @@ use std::time::Duration;
 fn main() {
     loop {
         println!("i'm stupid");
-        sleep(Duration::from_nanos(10))
+        sleep(Duration::from_millis(5000))
     }
 }

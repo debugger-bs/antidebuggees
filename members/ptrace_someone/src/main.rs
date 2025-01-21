@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{exit, Child, Command};
 
+use nix::libc::WUNTRACED;
 use nix::sys::ptrace::{self, Options};
+use nix::sys::wait::{waitpid, WaitPidFlag};
 use nix::unistd::Pid;
 
 fn main() {
@@ -28,17 +30,33 @@ fn main() {
         launch(path_to_executable, &process_args).expect("could not launch child process");
 
     trace(&child);
-    child.wait().expect("child is dead");
+    // child.wait().expect("child is dead");
+
+    print!("DONE");
 }
 
 fn trace(child: &Child) {
     let pid = Pid::from_raw(child.id() as i32);
     println!("pid of child: {pid}");
+    // From man ptrace
+    // PTRACE_ATTACH
+    //   Attach  to  the  process specified in pid, making it a tracee of the calling process.
+    //   The tracee is sent a SIGSTOP, but will not
+    //   necessarily have stopped by the completion of this call; use waitpid(2) to wait for the tracee to stop.
+    //   See the "Attaching and detaching" // subsection for
+    //   additional information.  (addr and data are ignored.)
     ptrace::attach(pid).expect("could not attach ptrace to child");
-    // if let Err(e) = ptrace::cont(pid, None) {
-    //     eprintln!("ptrace cannot continue: {e}");
-    //     exit(4)
-    // }
+    // wait until the child processes the SIGSTOP
+    match waitpid(pid, Some(WaitPidFlag::WUNTRACED)) {
+        Ok(ws) => println!("waited for {pid} to change status success: it is now {ws:?}"),
+        Err(e) => eprintln!("waited for {pid} to change status failure: {e}"),
+    }
+    // from man ptrace:
+    // ESRCH  The specified process does not exist, or is not currently being traced by the caller, or is not stopped (for requests that require a stopped tracee).
+    if let Err(e) = ptrace::detach(pid, None) {
+        eprintln!("ptrace cannot detach: {e}");
+        exit(4)
+    }
 }
 
 fn launch(path_to_executable: impl AsRef<Path>, args: &[String]) -> Result<Child, std::io::Error> {
