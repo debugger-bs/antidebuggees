@@ -43,6 +43,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "orphan"
+version = "0.1.0"
+dependencies = [
+ "nix",
+]
+
+[[package]]
 name = "ptrace_someone"
 version = "0.1.0"
 dependencies = [
