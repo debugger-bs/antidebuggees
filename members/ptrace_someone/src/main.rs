@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::process::{exit, Child, Command};
+use std::thread::sleep_ms;
 
-use nix::libc::WUNTRACED;
+use nix::libc::{WUNTRACED, __WALL};
 use nix::sys::ptrace::{self, Options};
+use nix::sys::signal::Signal;
 use nix::sys::wait::{waitpid, WaitPidFlag};
 use nix::unistd::Pid;
 
@@ -32,6 +34,7 @@ fn main() {
     trace(&child);
     // child.wait().expect("child is dead");
 
+    child.kill().expect("cant kill child :(");
     print!("DONE");
 }
 
@@ -45,18 +48,47 @@ fn trace(child: &Child) {
     //   necessarily have stopped by the completion of this call; use waitpid(2) to wait for the tracee to stop.
     //   See the "Attaching and detaching" // subsection for
     //   additional information.  (addr and data are ignored.)
-    ptrace::attach(pid).expect("could not attach ptrace to child");
-    // wait until the child processes the SIGSTOP
-    match waitpid(pid, Some(WaitPidFlag::WUNTRACED)) {
-        Ok(ws) => println!("waited for {pid} to change status success: it is now {ws:?}"),
-        Err(e) => eprintln!("waited for {pid} to change status failure: {e}"),
-    }
+    //
+    // Attach sucks because it cant do interrupt, that's seize only. Seize does not stop the process automatically too.
+    ptrace::seize(pid, Options::empty()).expect("could not attach ptrace to child");
+    analyze(pid);
     // from man ptrace:
     // ESRCH  The specified process does not exist, or is not currently being traced by the caller, or is not stopped (for requests that require a stopped tracee).
     if let Err(e) = ptrace::detach(pid, None) {
         eprintln!("ptrace cannot detach: {e}");
         exit(4)
     }
+}
+
+fn wait_status(pid: Pid) {
+    // to wait until that child stops: None
+    // to wait until that child continues: ???????
+    match waitpid(pid, None) {
+        Ok(ws) => println!("waited for {pid} to change status success: it is now {ws:?}"),
+        Err(e) => eprintln!("waited for {pid} to change status failure: {e}"),
+    }
+}
+
+fn analyze(pid: Pid) {
+    //  PTRACE_INTERRUPT only works on tracees attached by PTRACE_SEIZE.
+    println!("interrupting...");
+    ptrace::interrupt(pid).unwrap();
+    wait_status(pid);
+    let mut regs = ptrace::getregs(pid).expect("could not get regs");
+    println!("All Regs:\n{:#?}", regs);
+    println!("RIP: {}", regs.rip);
+    println!("step...");
+    ptrace::step(pid, None).expect("could not step");
+    wait_status(pid);
+    regs = ptrace::getregs(pid).expect("could not get regs");
+    println!("RIP: {}", regs.rip);
+    println!("continuing...");
+    ptrace::cont(pid, None).expect("could not continue child");
+    // no need to wait because reasons
+    sleep_ms(1000);
+    println!("interrupting...");
+    ptrace::interrupt(pid).unwrap();
+    wait_status(pid);
 }
 
 fn launch(path_to_executable: impl AsRef<Path>, args: &[String]) -> Result<Child, std::io::Error> {

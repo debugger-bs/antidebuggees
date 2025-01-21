@@ -9,6 +9,7 @@ static mut STATUS: Option<libc::c_int> = None;
 // does nothing and wastes time
 fn main() {
     install_handler();
+    let mut i: u16 = 0;
     loop {
         unsafe {
             if let Some(sig) = STATUS {
@@ -16,17 +17,22 @@ fn main() {
                 STATUS = None;
             }
         }
-        sleep(Duration::from_millis(50))
+
+        sleep(Duration::from_millis(50));
+        i = i.wrapping_add(1);
+        if i % 10 == 0 {
+            println!("dummy");
+        }
     }
 }
 
 fn install_handler() {
     let sigs = [
-        signal::SIGTRAP,
-        signal::SIGTERM,
-        signal::SIGCONT,
-        signal::SIGHUP,
-        signal::SIGINT,
+        // signal::SIGTRAP,
+        // signal::SIGTERM,
+        // signal::SIGCONT,
+        // signal::SIGHUP,
+        // signal::SIGINT,
     ];
     unsafe {
         let sig_action = signal::SigAction::new(
